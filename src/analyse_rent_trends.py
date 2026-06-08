@@ -72,6 +72,31 @@ def create_dublin_vs_non_dublin(df: pd.DataFrame) -> pd.DataFrame:
     return grouped
 
 
+def create_dublin_premium_table(comparison: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate Dublin's rent premium over the non-Dublin average by quarter.
+    """
+    wide = comparison.pivot(
+        index=["period", "period_start"],
+        columns="region_group",
+        values="average_rent_eur",
+    ).reset_index()
+
+    wide["dublin_premium_eur"] = wide["Dublin"] - wide["Non-Dublin average"]
+    wide["dublin_premium_percent"] = (
+        wide["dublin_premium_eur"] / wide["Non-Dublin average"]
+    ) * 100
+
+    return wide
+
+
+def create_top_latest_counties(latest: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+    """
+    Return the highest-rent counties in the latest quarter.
+    """
+    return latest.head(top_n).copy()
+
+
 def create_latest_county_snapshot(df: pd.DataFrame) -> pd.DataFrame:
     """
     Return latest available county rent values.
@@ -147,6 +172,44 @@ def save_dublin_vs_non_dublin_chart(comparison: pd.DataFrame) -> Path:
     plt.xlabel("Quarter")
     plt.ylabel("Average monthly rent (EUR)")
     plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+    return output_path
+
+
+def save_dublin_premium_chart(premium: pd.DataFrame) -> Path:
+    """
+    Save Dublin rent premium over non-Dublin average chart.
+    """
+    output_path = FIGURES_DIR / "dublin_rent_premium_over_non_dublin.png"
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(premium["period_start"], premium["dublin_premium_percent"])
+    plt.title("Dublin Rent Premium over Non-Dublin Average")
+    plt.xlabel("Quarter")
+    plt.ylabel("Premium (%)")
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+    return output_path
+
+
+def save_top_latest_counties_chart(top_latest: pd.DataFrame) -> Path:
+    """
+    Save top 10 highest-rent counties chart.
+    """
+    output_path = FIGURES_DIR / "top_10_latest_highest_rent_counties.png"
+
+    plot_data = top_latest.sort_values("rent_eur", ascending=True)
+
+    plt.figure(figsize=(10, 6))
+    plt.barh(plot_data["location"], plot_data["rent_eur"])
+    plt.title(f"Top 10 Highest County Rents ({top_latest['quarter'].iloc[0]})")
+    plt.xlabel("Average monthly rent (EUR)")
+    plt.ylabel("County")
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
     plt.close()
@@ -306,11 +369,15 @@ def run_analysis() -> dict[str, object]:
     comparison = create_dublin_vs_non_dublin(county_data)
     latest = create_latest_county_snapshot(county_data)
     growth = create_county_growth_table(county_data)
+    premium = create_dublin_premium_table(comparison)
+    top_latest = create_top_latest_counties(latest)
 
     chart_paths = [
         save_national_average_chart(national),
         save_dublin_vs_non_dublin_chart(comparison),
+        save_dublin_premium_chart(premium),
         save_latest_county_rents_chart(latest),
+        save_top_latest_counties_chart(top_latest),
         save_county_growth_chart(growth),
     ]
 
@@ -328,6 +395,8 @@ def run_analysis() -> dict[str, object]:
         "dublin_vs_non_dublin": comparison,
         "latest": latest,
         "growth": growth,
+        "dublin_premium": premium,
+        "top_latest": top_latest,
         "chart_paths": chart_paths,
         "report_path": report_path,
     }
@@ -344,6 +413,16 @@ if __name__ == "__main__":
 
     print("\nLatest county rents:")
     print(outputs["latest"][["location", "quarter", "rent_eur"]].head(10))
+
+    print("\nTop 10 latest highest-rent counties:")
+    print(outputs["top_latest"][["location", "quarter", "rent_eur"]])
+
+    print("\nLatest Dublin rent premium:")
+    print(
+        outputs["dublin_premium"][
+            ["period", "Dublin", "Non-Dublin average", "dublin_premium_percent"]
+        ].tail(1)
+    )
 
     print("\nFastest percentage growth:")
     print(

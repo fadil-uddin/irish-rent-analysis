@@ -47,6 +47,7 @@ The analysis script generates:
 - figures/county_rent_growth_since_2007.png
 - reports/key_findings.md
 - reports/executive_summary.md
+- slides/consulting_deck.md
 
 ## Project Structure
 
